@@ -1800,56 +1800,372 @@ export default function GameCanvas({
         ctx.setLineDash([]); // clear
       }
 
-      // Draw Main Cell Body (Muton Core)
-      const bodyGrad = ctx.createRadialGradient(playerX - 4, state.playerY - 4, playerRadius * 0.1, playerX, state.playerY, playerRadius);
-      bodyGrad.addColorStop(0, '#a5b4fc'); // glowing central nucleus indigo
-      bodyGrad.addColorStop(0.5, '#4f46e5'); // indigo body
-      bodyGrad.addColorStop(1, '#312e81');  // deep indigo boundary
+      // Draw 3D Ambient Drop Shadow under Muton for grounding depth
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(playerX - 2, state.playerY + playerRadius + 6, playerRadius * 0.85, playerRadius * 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.filter = 'blur(6px)';
+      ctx.fill();
+      ctx.restore();
+
+      // Draw Main 3D Cell Body Base (Translucent cytoplasm)
+      ctx.save();
+      
+      // Secondary outer refractive glow / membrane boundary
+      const outerGlow = ctx.createRadialGradient(
+        playerX - playerRadius * 0.15,
+        state.playerY - playerRadius * 0.15,
+        playerRadius * 0.8,
+        playerX,
+        state.playerY,
+        playerRadius * 1.05
+      );
+      outerGlow.addColorStop(0, 'rgba(79, 70, 229, 0.05)'); // indigo core translucent
+      outerGlow.addColorStop(0.75, 'rgba(99, 102, 241, 0.4)'); // indigo edge
+      outerGlow.addColorStop(0.95, 'rgba(129, 140, 248, 0.85)'); // bright outer membrane edge
+      outerGlow.addColorStop(1, 'rgba(255, 255, 255, 0.2)'); // thin highlight border
+      
+      ctx.beginPath();
+      ctx.arc(playerX, state.playerY, playerRadius * 1.05, 0, Math.PI * 2);
+      ctx.fillStyle = outerGlow;
+      ctx.fill();
+
+      // Main Cell Body Volume (Muton 3D Cytosol Sphere)
+      const bodyGrad3D = ctx.createRadialGradient(
+        playerX - playerRadius * 0.35, 
+        state.playerY - playerRadius * 0.35, 
+        playerRadius * 0.05, 
+        playerX - playerRadius * 0.1,
+        state.playerY - playerRadius * 0.1, 
+        playerRadius
+      );
+      bodyGrad3D.addColorStop(0, '#c7d2fe'); // glowing upper highlight interior
+      bodyGrad3D.addColorStop(0.35, '#818cf8'); // soft lavender transition
+      bodyGrad3D.addColorStop(0.7, '#4f46e5'); // core indigo
+      bodyGrad3D.addColorStop(1, '#1e1b4b');  // deep dark shadow region at the bottom-right
+      
       ctx.beginPath();
       ctx.arc(playerX, state.playerY, playerRadius, 0, Math.PI * 2);
-      ctx.fillStyle = bodyGrad;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.5;
+      ctx.fillStyle = bodyGrad3D;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 1.5;
       ctx.fill();
       ctx.stroke();
 
-      // Draw organelles/lipids inside the player cell
+      // Draw Internal Organelles revolving in 3D Space (translucent parallax depth)
+      const rotY = state.frame * 0.025;
+      const rotX = state.frame * 0.015;
+      
+      const internalOrganelles3D = [
+        { x: -0.4, y: -0.3, z: 0.15, color: '#ec4899', type: 'ribosome' }, // pink ribosome
+        { x: 0.35, y: 0.25, z: -0.3, color: '#10b981', type: 'lysosome' }, // green lysosome
+        { x: -0.15, y: 0.45, z: 0.35, color: '#06b6d4', type: 'vesicle' }, // cyan vesicle
+        { x: 0.2, y: -0.35, z: -0.45, color: '#f59e0b', type: 'lipid' }    // amber lipid
+      ];
+
+      internalOrganelles3D.forEach(org => {
+        // Rotate unit coordinates around Y axis
+        let x1 = org.x * Math.cos(rotY) - org.z * Math.sin(rotY);
+        let z1 = org.x * Math.sin(rotY) + org.z * Math.cos(rotY);
+        
+        // Rotate around X axis
+        let y2 = org.y * Math.cos(rotX) - z1 * Math.sin(rotX);
+        let z2 = org.y * Math.sin(rotX) + z1 * Math.cos(rotX);
+
+        // Map to 2D screen coordinate relative to player cell
+        const orgX = playerX + x1 * playerRadius * 0.78;
+        const orgY = state.playerY + y2 * playerRadius * 0.78;
+
+        // Size scaling based on 3D depth (Z-depth z2 ranges approx -0.7 to 0.7)
+        const depthScale = 0.55 + 0.45 * z2; // closer = bigger, further = smaller
+        const orgRadius = 4.2 * depthScale * state.sizeMultiplier;
+
+        // Opacity based on depth to simulate translucency within cytosol
+        ctx.save();
+        ctx.globalAlpha = 0.4 + 0.5 * ((z2 + 0.7) / 1.4); // further away organelles are dimmer and covered by fluid
+
+        ctx.beginPath();
+        ctx.arc(orgX, orgY, orgRadius, 0, Math.PI * 2);
+        
+        // 3D sphere gradient for each tiny organelle
+        const orgGrad = ctx.createRadialGradient(
+          orgX - orgRadius * 0.3,
+          orgY - orgRadius * 0.3,
+          orgRadius * 0.1,
+          orgX,
+          orgY,
+          orgRadius
+        );
+        orgGrad.addColorStop(0, '#ffffff');
+        orgGrad.addColorStop(0.3, org.color);
+        orgGrad.addColorStop(1, '#0f172a');
+
+        ctx.fillStyle = orgGrad;
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // Suspended Nucleus (DNA Core) with 3D Depth & velocity-based fluid lag
+      const velocityLagY = state.playerVY * 0.55; // internal core slides slightly opposite to thurster velocity
+      const nucX = playerX + playerRadius * 0.08;
+      const nucY = state.playerY + playerRadius * 0.08 - velocityLagY;
+      const nucRadius = playerRadius * 0.36;
+
+      ctx.save();
+      // Glowing ambient blur behind nucleus
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#a78bfa';
+      
+      const nucGrad = ctx.createRadialGradient(
+        nucX - nucRadius * 0.25,
+        nucY - nucRadius * 0.25,
+        nucRadius * 0.05,
+        nucX,
+        nucY,
+        nucRadius
+      );
+      nucGrad.addColorStop(0, '#ffffff'); // bright core
+      nucGrad.addColorStop(0.4, '#c084fc'); // glowing violet
+      nucGrad.addColorStop(0.85, '#6d28d9'); // deep purple
+      nucGrad.addColorStop(1, 'rgba(49, 46, 129, 0.4)'); // fading edge
+
       ctx.beginPath();
-      ctx.arc(playerX - playerRadius * 0.3, state.playerY - playerRadius * 0.3, playerRadius * 0.25, 0, Math.PI * 2);
-      ctx.fillStyle = '#ec4899'; // pink ribosome organelle
+      ctx.arc(nucX, nucY, nucRadius, 0, Math.PI * 2);
+      ctx.fillStyle = nucGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // Draw Rotating 3D Surface Glycoprotein Receptors (physical antenna outline)
+      const surfaceReceptors3D = [
+        { x: 0.82, y: 0.15, z: 0.5 },
+        { x: -0.75, y: -0.45, z: 0.42 },
+        { x: 0.25, y: -0.85, z: 0.48 },
+        { x: -0.42, y: 0.72, z: 0.55 },
+        { x: 0.52, y: 0.65, z: -0.58 },
+        { x: -0.85, y: 0.32, z: -0.48 },
+        { x: 0.18, y: -0.62, z: -0.82 },
+        { x: -0.32, y: -0.75, z: -0.58 }
+      ];
+
+      surfaceReceptors3D.forEach(rec => {
+        // Rotate unit coordinates dynamically
+        const rotY_rec = state.frame * 0.016;
+        const rotX_rec = state.frame * 0.009;
+
+        let rx1 = rec.x * Math.cos(rotY_rec) - rec.z * Math.sin(rotY_rec);
+        let rz1 = rec.x * Math.sin(rotY_rec) + rec.z * Math.cos(rotY_rec);
+        
+        let ry2 = rec.y * Math.cos(rotX_rec) - rz1 * Math.sin(rotX_rec);
+        let rz2 = rec.y * Math.sin(rotX_rec) + rz1 * Math.cos(rotX_rec);
+
+        const scrX = playerX + rx1 * playerRadius;
+        const scrY = state.playerY + ry2 * playerRadius;
+
+        // Front-facing receptors: Draw glowing micro-domes mapped on sphere surface
+        if (rz2 > 0.12) {
+          const bumpR = 3.6 * state.sizeMultiplier * (0.65 + 0.35 * rz2);
+          ctx.beginPath();
+          ctx.arc(scrX, scrY, bumpR, 0, Math.PI * 2);
+          const bumpGrad = ctx.createRadialGradient(
+            scrX - bumpR * 0.2,
+            scrY - bumpR * 0.2,
+            bumpR * 0.1,
+            scrX,
+            scrY,
+            bumpR
+          );
+          bumpGrad.addColorStop(0, '#f472b6'); // hot pink glowing tip
+          bumpGrad.addColorStop(0.35, '#db2777');
+          bumpGrad.addColorStop(1, 'rgba(236, 72, 153, 0)'); // fades smoothly into main cell color
+          ctx.fillStyle = bumpGrad;
+          ctx.fill();
+        } 
+        // Edge silhouette receptors: Draw protruding physical stems sticking out
+        else if (rz2 > -0.45 && rz2 <= 0.12) {
+          const angleFromCenter = Math.atan2(ry2, rx1);
+          const sX = playerX + Math.cos(angleFromCenter) * playerRadius;
+          const sY = state.playerY + Math.sin(angleFromCenter) * playerRadius;
+          const stemLen = 7.5 * state.sizeMultiplier;
+          const eX = playerX + Math.cos(angleFromCenter) * (playerRadius + stemLen);
+          const eY = state.playerY + Math.sin(angleFromCenter) * (playerRadius + stemLen);
+
+          ctx.beginPath();
+          ctx.moveTo(sX, sY);
+          ctx.lineTo(eX, eY);
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          // Protruding 3D receptor bulb
+          ctx.beginPath();
+          ctx.arc(eX, eY, 3.2 * state.sizeMultiplier, 0, Math.PI * 2);
+          const bulbGrad = ctx.createRadialGradient(
+            eX - 1, eY - 1, 0.5,
+            eX, eY, 3.2 * state.sizeMultiplier
+          );
+          bulbGrad.addColorStop(0, '#fef08a'); // gold shiny tip
+          bulbGrad.addColorStop(0.4, '#ec4899'); // pink bulb
+          bulbGrad.addColorStop(1, '#831843'); // deep base
+          ctx.fillStyle = bulbGrad;
+          ctx.fill();
+        }
+      });
+
+      // Glossy specular highlight reflection (Glass effect)
+      ctx.beginPath();
+      ctx.ellipse(
+        playerX - playerRadius * 0.38, 
+        state.playerY - playerRadius * 0.38, 
+        playerRadius * 0.28, 
+        playerRadius * 0.13, 
+        -Math.PI / 4, 
+        0, 
+        Math.PI * 2
+      );
+      const specGrad = ctx.createLinearGradient(
+        playerX - playerRadius * 0.5,
+        state.playerY - playerRadius * 0.5,
+        playerX - playerRadius * 0.2,
+        state.playerY - playerRadius * 0.2
+      );
+      specGrad.addColorStop(0, 'rgba(255, 255, 255, 0.65)');
+      specGrad.addColorStop(1, 'rgba(255, 255, 255, 0.02)');
+      ctx.fillStyle = specGrad;
       ctx.fill();
 
-      // Nucleolus (DNA Core)
+      // Secondary bottom-left refraction rim light highlight
       ctx.beginPath();
-      ctx.arc(playerX + playerRadius * 0.1, state.playerY + playerRadius * 0.1, playerRadius * 0.35, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.ellipse(
+        playerX + playerRadius * 0.4, 
+        state.playerY + playerRadius * 0.4, 
+        playerRadius * 0.3, 
+        playerRadius * 0.08, 
+        -Math.PI / 4, 
+        0, 
+        Math.PI * 2
+      );
+      ctx.fillStyle = 'rgba(165, 180, 252, 0.22)';
       ctx.fill();
 
-      // Draw responsive eyes based on flying state
-      ctx.fillStyle = '#ffffff';
+      // Draw Volumetric 3D Shaded Eyeballs (Specular spheres)
+      const eyeX = playerX + playerRadius * 0.35;
+      const eyeY = state.playerY - 3;
+      const eyeR = 4.5 * state.sizeMultiplier;
+
+      // Eyeball 3D spherical gradient
+      const eyeGrad = ctx.createRadialGradient(
+        eyeX - eyeR * 0.3,
+        eyeY - eyeR * 0.3,
+        eyeR * 0.1,
+        eyeX,
+        eyeY,
+        eyeR
+      );
+      eyeGrad.addColorStop(0, '#ffffff'); // shiny highlight
+      eyeGrad.addColorStop(0.75, '#f1f5f9'); // white body
+      eyeGrad.addColorStop(1, '#cbd5e1'); // shadow contour giving 3D curvature
+
       ctx.beginPath();
-      // eye 1
-      ctx.arc(playerX + playerRadius * 0.35, state.playerY - 3, 4 * state.sizeMultiplier, 0, Math.PI * 2);
+      ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+      ctx.fillStyle = eyeGrad;
       ctx.fill();
-      // pupils
+
+      // Pupils with dynamic 3D tracking & eye specular glint
+      ctx.save();
+      const lookY = state.isAscending ? -4.5 : 1.5; // tracking motion
+      const pupilX = eyeX + eyeR * 0.28;
+      const pupilY = eyeY + lookY * 0.3;
+      const pupilR = 2.2 * state.sizeMultiplier;
+
+      ctx.beginPath();
+      ctx.arc(pupilX, pupilY, pupilR, 0, Math.PI * 2);
       ctx.fillStyle = '#000000';
-      ctx.beginPath();
-      const lookY = state.isAscending ? -4.5 : 1.5; // pupil responsive look direction
-      ctx.arc(playerX + playerRadius * 0.42, state.playerY - 3 + lookY * 0.3, 2 * state.sizeMultiplier, 0, Math.PI * 2);
       ctx.fill();
+
+      // Eye specular reflection glint (gives life to the character)
+      ctx.beginPath();
+      ctx.arc(pupilX - pupilR * 0.3, pupilY - pupilR * 0.3, pupilR * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.restore();
 
       // Draw dynamic appendages based on unlocked phenotypes!
       const currentStats = analyzeGenome(state.genes);
       
-      // Render cute little double-helix wings if they have Hyper-Hydrophobic ATPase jetpack
+      // Render majestic animated twisting 3D DOUBLE-HELIX wings for Hyper-Hydrophobic ATPase jetpack
       if (currentStats.thrusterTier >= 2) {
-        ctx.strokeStyle = '#f472b6'; // pink wing
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        // wave shape wing
-        ctx.moveTo(playerX - 10, state.playerY - 5);
-        ctx.bezierCurveTo(playerX - playerRadius * 1.5, state.playerY - playerRadius * 1.4, playerX - playerRadius * 1.2, state.playerY + 5, playerX - 5, state.playerY + 8);
-        ctx.stroke();
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f472b6';
+
+        const wingLength = playerRadius * 1.55;
+        const numSegments = 16;
+        const baseWingX = playerX - playerRadius * 0.55;
+
+        for (let i = 0; i <= numSegments; i++) {
+          const t = i / numSegments;
+          const segmentX = baseWingX - t * wingLength;
+          
+          // Phase angle for twisting effect
+          const strandAngle = t * Math.PI * 2.6 - state.frame * 0.16;
+          
+          // Sinusoidal vertical displacement with 3D depth projection scaling
+          const amplitude = playerRadius * 0.44 * (0.3 + 0.7 * t);
+          const yOffsetStrandA = Math.sin(strandAngle) * amplitude;
+          const yOffsetStrandB = Math.sin(strandAngle + Math.PI) * amplitude;
+
+          const screenYA = state.playerY + yOffsetStrandA;
+          const screenYB = state.playerY + yOffsetStrandB;
+
+          // Projected particle thickness based on simulated 3D depth (Z-depth)
+          const zDepthA = Math.cos(strandAngle);
+          const zDepthB = Math.cos(strandAngle + Math.PI);
+          
+          const radiusA = (3.2 * (0.6 + 0.4 * zDepthA)) * (1 - 0.38 * t) * state.sizeMultiplier;
+          const radiusB = (3.2 * (0.6 + 0.4 * zDepthB)) * (1 - 0.38 * t) * state.sizeMultiplier;
+
+          // Complementary connecting ladder rungs (only draw if facing and not too far apart)
+          if (i % 2 === 0) {
+            ctx.beginPath();
+            ctx.moveTo(segmentX, screenYA);
+            ctx.lineTo(segmentX, screenYB);
+            
+            // gradient linking color
+            const rungGrad = ctx.createLinearGradient(segmentX, screenYA, segmentX, screenYB);
+            rungGrad.addColorStop(0, 'rgba(244, 114, 182, 0.45)'); // pink
+            rungGrad.addColorStop(1, 'rgba(56, 189, 248, 0.45)');  // cyan
+            
+            ctx.strokeStyle = rungGrad;
+            ctx.lineWidth = 1.2 * (1 - 0.3 * t);
+            ctx.stroke();
+          }
+
+          // Strand A Node (Pink)
+          ctx.beginPath();
+          ctx.arc(segmentX, screenYA, Math.max(0.5, radiusA), 0, Math.PI * 2);
+          const nodeAGrad = ctx.createRadialGradient(
+            segmentX - radiusA * 0.2, screenYA - radiusA * 0.2, 0,
+            segmentX, screenYA, radiusA
+          );
+          nodeAGrad.addColorStop(0, '#fbcfe8');
+          nodeAGrad.addColorStop(1, '#f43f5e');
+          ctx.fillStyle = nodeAGrad;
+          ctx.fill();
+
+          // Strand B Node (Cyan)
+          ctx.beginPath();
+          ctx.arc(segmentX, screenYB, Math.max(0.5, radiusB), 0, Math.PI * 2);
+          const nodeBGrad = ctx.createRadialGradient(
+            segmentX - radiusB * 0.2, screenYB - radiusB * 0.2, 0,
+            segmentX, screenYB, radiusB
+          );
+          nodeBGrad.addColorStop(0, '#e0f2fe');
+          nodeBGrad.addColorStop(1, '#0ea5e9');
+          ctx.fillStyle = nodeBGrad;
+          ctx.fill();
+        }
+        ctx.restore();
       }
 
       ctx.restore();
