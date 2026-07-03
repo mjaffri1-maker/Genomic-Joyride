@@ -3,7 +3,8 @@ import { Gene, WILD_TYPE_GENES, PlayerStats } from './types';
 import MutationLab from './components/MutationLab';
 import GameCanvas from './components/GameCanvas';
 import EducationalWiki from './components/EducationalWiki';
-import { Dna, Award, BookOpen, Settings, Zap, Compass, RefreshCw, BarChart2, Star, Shield, Play } from 'lucide-react';
+import TutorialModal from './components/TutorialModal';
+import { Dna, Award, BookOpen, Settings, Zap, Compass, RefreshCw, BarChart2, Star, Shield, Play, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface RunHistoryEntry {
@@ -19,6 +20,7 @@ interface RunHistoryEntry {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'lab' | 'run' | 'library'>('lab');
+  const [showTutorial, setShowTutorial] = useState(false);
   
   // Genome state shared between the sandbox/mutation workbench and active runner gameplay
   const [genes, setGenes] = useState<Gene[]>(() => {
@@ -214,6 +216,12 @@ export default function App() {
             >
               <BookOpen className="w-4 h-4" /> Genetic Wiki
             </button>
+            <button
+              onClick={() => setShowTutorial(true)}
+              className="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-md transition-all cursor-pointer text-amber-400 hover:text-amber-300 hover:bg-amber-500/5 border border-dashed border-amber-500/20 bg-amber-500/5"
+            >
+              <HelpCircle className="w-4 h-4 text-amber-400 animate-pulse" /> Tutorial Guide
+            </button>
           </nav>
 
           {/* High Score & DNA HUD */}
@@ -369,6 +377,13 @@ export default function App() {
           Central Dogma: DNA &rarr; Transcription &rarr; mRNA &rarr; Translation &rarr; Polypeptides / Phenotypes
         </p>
       </footer>
+
+      {/* Interactive Step-by-Step Tutorial Modal */}
+      <TutorialModal 
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onNavigateToTab={(tab) => setActiveTab(tab)}
+      />
     </div>
   );
 }
