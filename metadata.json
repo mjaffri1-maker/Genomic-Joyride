@@ -1,0 +1,6 @@
+{
+  "name": "Genomic Joyride",
+  "description": "An educational side-scrolling runner game where you mutate your character's DNA in real-time, gaining new phenotypes to survive challenging genomic environments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
