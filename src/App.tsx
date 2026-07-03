@@ -177,7 +177,7 @@ export default function App() {
                 Genomic Joyride
               </h1>
               <span className="text-[10px] font-mono font-bold text-cyan-400 tracking-widest uppercase block">
-                Intracellular Mutation Runner
+                AN INTRACELLULAR MUTATION RUNNER by MJM
               </span>
             </div>
           </div>

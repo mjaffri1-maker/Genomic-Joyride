@@ -45,7 +45,7 @@ export default function EducationalWiki() {
               </p>
             </div>
           </div>
-          <div className="bg-indigo-950/40 p-4 rounded-xl border border-indigo-500/30">
+          <div className="bg-indigo-950/40 p-5 rounded-xl border border-indigo-500/30 space-y-4">
             <h4 className="font-bold text-indigo-200 flex items-center gap-2 mb-2">
               <Sparkles className="w-4 h-4 text-indigo-400" />
               What are Codons?
@@ -53,6 +53,97 @@ export default function EducationalWiki() {
             <p className="text-sm text-gray-300 leading-relaxed">
               Because there are 4 genetic bases (A,T,C,G) and proteins use 20 different amino acids, bases are read in triplets. A 3-letter codon offers 4 × 4 × 4 = <strong>64 possible combinations</strong>, which is more than enough to encode all 20 amino acids. This creates a degenerate genetic code—multiple codons can translate into the same amino acid.
             </p>
+
+            {/* Codon Position & Wobble Base Illustration */}
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-4 font-sans">
+              <span className="text-[10px] uppercase tracking-wider text-indigo-400 font-mono font-bold block">Codon Translation & Wobble Hypothesis</span>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+                {/* Visual Schematic */}
+                <div className="lg:col-span-7 bg-slate-900/60 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center space-y-5 select-none relative overflow-hidden">
+                  
+                  {/* tRNA Anticodon */}
+                  <div className="flex flex-col items-center">
+                    <span className="text-[9px] font-bold text-pink-400 mb-1 tracking-wider uppercase">tRNA Anticodon (3' ➔ 5')</span>
+                    <div className="flex gap-2 font-mono">
+                      {/* Position 3 of anticodon pairs with Position 1 of codon */}
+                      <div className="flex flex-col items-center bg-pink-950/40 border border-pink-500/30 px-2.5 py-1 rounded">
+                        <span className="text-xs font-extrabold text-pink-300">G</span>
+                        <span className="text-[7px] text-slate-400">Pos 3</span>
+                      </div>
+                      <div className="flex flex-col items-center bg-pink-950/40 border border-pink-500/30 px-2.5 py-1 rounded">
+                        <span className="text-xs font-extrabold text-pink-300">A</span>
+                        <span className="text-[7px] text-slate-400">Pos 2</span>
+                      </div>
+                      <div className="flex flex-col items-center bg-purple-950/40 border border-purple-500/30 px-2.5 py-1 rounded relative">
+                        <span className="text-xs font-extrabold text-purple-300">I / U</span>
+                        <span className="text-[7px] text-purple-400 font-bold">Pos 1</span>
+                        {/* Ring indicator for tRNA wobble partner */}
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Base-Pairing Connections */}
+                  <div className="flex gap-11 text-xs text-slate-500 h-8 items-center font-mono">
+                    <div className="flex flex-col items-center">
+                      <span className="text-emerald-400 font-bold">║</span>
+                      <span className="text-[8px] text-emerald-500/80">Watson-Crick</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-emerald-400 font-bold">║</span>
+                      <span className="text-[8px] text-emerald-500/80">Watson-Crick</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-purple-400 font-extrabold text-sm leading-none select-none animate-pulse">⌇</span>
+                      <span className="text-[8px] text-purple-400 font-bold">Wobble Pair</span>
+                    </div>
+                  </div>
+
+                  {/* mRNA Codon */}
+                  <div className="flex flex-col items-center">
+                    <div className="flex gap-2 font-mono">
+                      {/* Position 1 of codon pairs with Position 3 of anticodon */}
+                      <div className="flex flex-col items-center bg-indigo-950/40 border border-indigo-500/30 px-2.5 py-1 rounded">
+                        <span className="text-xs font-extrabold text-indigo-300">C</span>
+                        <span className="text-[7px] text-slate-400">Base 1</span>
+                      </div>
+                      <div className="flex flex-col items-center bg-indigo-950/40 border border-indigo-500/30 px-2.5 py-1 rounded">
+                        <span className="text-xs font-extrabold text-indigo-300">U</span>
+                        <span className="text-[7px] text-slate-400">Base 2</span>
+                      </div>
+                      <div className="flex flex-col items-center bg-purple-950/40 border border-purple-500/30 px-2.5 py-1 rounded relative">
+                        <span className="text-xs font-extrabold text-purple-300">U / C / A</span>
+                        <span className="text-[7px] text-purple-400 font-bold">Base 3</span>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold text-indigo-400 mt-1 tracking-wider uppercase">mRNA Codon (5' ➔ 3')</span>
+                  </div>
+
+                </div>
+
+                {/* Wobble Base Definition & Explanation */}
+                <div className="lg:col-span-5 space-y-2.5 text-xs text-slate-300 leading-relaxed">
+                  <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                    <span>What is a Wobble Base?</span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    The <strong>wobble base</strong> is the nucleotide at the <strong>3rd position of an mRNA codon</strong>. 
+                    While the first two positions require strict Watson-Crick complementary pairing (A-U, G-C) to prevent incorrect translation, the 3rd position has relaxed spatial constraints (steric flexibility).
+                  </p>
+                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800 text-[10px] space-y-1">
+                    <span className="text-purple-400 font-bold block font-mono uppercase text-[9px]">The Biological Advantage</span>
+                    <p className="text-slate-400 leading-normal">
+                      This "wobble" allows a single tRNA anti-codon containing modified bases like <strong>Inosine (I)</strong> to hydrogen-bond with multiple synonym codons. Cells do not need 61 separate tRNAs—they can translate all 61 sense codons using only around 31 to 40 unique tRNAs!
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
           </div>
         </div>
       )
