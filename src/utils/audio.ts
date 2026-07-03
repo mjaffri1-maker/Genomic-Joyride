@@ -165,4 +165,33 @@ export class CellSynthMusic {
       this.ctx = null;
     }
   }
+
+  /**
+   * Play a cool speed boost sound effect.
+   */
+  public triggerSpeedBoostSound() {
+    if (!this.ctx) return;
+    try {
+      const time = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      // sweep frequency up quickly for speed-up feel!
+      osc.frequency.setValueAtTime(150, time);
+      osc.frequency.exponentialRampToValueAtTime(1200, time + 0.5);
+      
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.04, time + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+      
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      
+      osc.start(time);
+      osc.stop(time + 0.5);
+    } catch (e) {
+      console.warn("Failed to play boost sound", e);
+    }
+  }
 }

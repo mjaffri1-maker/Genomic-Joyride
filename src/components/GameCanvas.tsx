@@ -131,7 +131,11 @@ export default function GameCanvas({
     frame: 0,
     lastTime: 0,
     methylSilencedTimer: 0, // epigenetic silencing countdown
-    isInvincibleTimer: 0
+    isInvincibleTimer: 0,
+    playerTrail: [] as Array<{ x: number; y: number; r: number }>,
+    superSpeedPowerUps: [] as any[],
+    superSpeedTimer: 0,
+    backgroundOrganelles: [] as any[]
   });
 
   // Keep genes and states synced to the ref, applying permanent upgrade levels directly
@@ -200,6 +204,25 @@ export default function GameCanvas({
     stateRef.current.frame = 0;
     stateRef.current.methylSilencedTimer = 0;
     stateRef.current.isInvincibleTimer = 0;
+    stateRef.current.playerTrail = [];
+    stateRef.current.superSpeedPowerUps = [];
+    stateRef.current.superSpeedTimer = 0;
+    
+    // Generate 18 random background organelles for parallax intracellular aesthetic
+    stateRef.current.backgroundOrganelles = [];
+    for (let i = 0; i < 18; i++) {
+      const types = ['mitochondria', 'ribosome_cluster', 'lysosome', 'er_strand', 'vesicle'];
+      const type = types[Math.floor(Math.random() * types.length)];
+      stateRef.current.backgroundOrganelles.push({
+        x: Math.random() * 1000, // spread across starting space
+        y: 50 + Math.random() * 350,
+        size: 25 + Math.random() * 45,
+        type,
+        speedFactor: 0.08 + Math.random() * 0.14, // beautiful slow parallax speed multiplier
+        angle: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.005 + Math.random() * 0.015
+      });
+    }
 
     // Apply starting genes phenotypes
     const startStats = analyzeGenome(genes);
@@ -373,9 +396,35 @@ export default function GameCanvas({
       state.frame++;
 
       // Update distance based on horizontal scrolling speed
-      const scrollSpeed = 4 + Math.min(state.distance / 1000, 3); // speed increases slowly
+      const baseScrollSpeed = 4 + Math.min(state.distance / 1000, 3); // speed increases slowly
+      const scrollSpeed = state.superSpeedTimer > 0 ? baseScrollSpeed * 2.8 : baseScrollSpeed;
       state.distance += Math.floor(scrollSpeed * 0.1);
       setDistance(state.distance);
+
+      // Update background organelles parallax position
+      if (state.backgroundOrganelles) {
+        state.backgroundOrganelles.forEach(org => {
+          org.x -= scrollSpeed * org.speedFactor;
+          org.angle += org.pulseSpeed;
+          if (org.x < -org.size * 2) {
+            org.x = canvas.width + org.size * 2;
+            org.y = 50 + Math.random() * 350;
+          }
+        });
+      }
+
+      // Update player movement trail (longer trail)
+      state.playerTrail = state.playerTrail || [];
+      state.playerTrail.forEach(pt => {
+        pt.x -= scrollSpeed;
+      });
+      const pRadius = 24 * state.sizeMultiplier;
+      state.playerTrail.push({ x: 100, y: state.playerY, r: pRadius });
+      
+      const maxTrailLength = state.superSpeedTimer > 0 ? 55 : 40;
+      while (state.playerTrail.length > maxTrailLength) {
+        state.playerTrail.shift();
+      }
 
       // 1. Check for zone change based on distance
       let nextZone: GameZone = 'Cytoplasm';
@@ -404,6 +453,11 @@ export default function GameCanvas({
       }
 
       // Decrement timers
+      if (state.superSpeedTimer > 0) {
+        state.superSpeedTimer--;
+        state.isInvincibleTimer = Math.max(state.isInvincibleTimer, 16.6); // keep player invincible during boost
+      }
+
       if (state.methylSilencedTimer > 0) {
         state.methylSilencedTimer -= 16.6; // approx 60fps frame delta
         if (state.methylSilencedTimer <= 0) {
@@ -575,6 +629,60 @@ export default function GameCanvas({
         }
       });
 
+      // 3.7 Spawn and manage Super-Speed ATP Power-Ups
+      if (state.frame % 480 === 0) {
+        state.superSpeedPowerUps = state.superSpeedPowerUps || [];
+        state.superSpeedPowerUps.push({
+          x: canvas.width + 50,
+          y: 80 + Math.random() * 280,
+          radius: 16,
+          angle: 0,
+          collected: false
+        });
+      }
+
+      // Update Super-Speed Power-Ups
+      state.superSpeedPowerUps = state.superSpeedPowerUps || [];
+      state.superSpeedPowerUps.forEach(ss => {
+        ss.x -= scrollSpeed;
+        ss.angle += 0.05;
+      });
+
+      state.superSpeedPowerUps = state.superSpeedPowerUps.filter(ss => ss.x > -30 && !ss.collected);
+
+      // Collision Super-Speed Power-Up detection
+      state.superSpeedPowerUps.forEach(ss => {
+        const dx = ss.x - 100;
+        const dy = ss.y - state.playerY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const colRadius = baseRadius + ss.radius;
+
+        if (dist < colRadius) {
+          ss.collected = true;
+          state.superSpeedTimer = 180; // approx 3 seconds
+          state.score += 250;
+          setScore(state.score);
+
+          // Play boost sound
+          if (musicRef.current) {
+            try {
+              musicRef.current.triggerSpeedBoostSound();
+            } catch (e) {
+              console.warn("Failed to play boost sound", e);
+            }
+          }
+
+          // Generate huge explosion of gold sparkles
+          for (let i = 0; i < 25; i++) {
+            state.particles.push(new Particle(
+              ss.x, ss.y, '#fbbf24', 
+              (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, 
+              Math.random() * 4 + 2
+            ));
+          }
+        }
+      });
+
       // 4. Spawn Mutation Portals
       if (state.frame % 380 === 0) {
         state.mutationPortals.push({
@@ -733,7 +841,25 @@ export default function GameCanvas({
         const dist = Math.sqrt(dx * dx + dy * dy);
         const colRadius = baseRadius + o.radius;
 
-        if (dist < colRadius && o.active && state.isInvincibleTimer <= 0) {
+        if (dist < colRadius && o.active) {
+          // If in super speed, explode the obstacle and award bonus points!
+          if (state.superSpeedTimer > 0) {
+            o.active = false;
+            state.score += 100; // reward for smash-through
+            setScore(state.score);
+            
+            // Spawn smash particles
+            for (let i = 0; i < 15; i++) {
+              state.particles.push(new Particle(
+                o.x, o.y, '#fbbf24', // golden particles
+                (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, 
+                Math.random() * 3 + 2
+              ));
+            }
+            return;
+          }
+
+          if (state.isInvincibleTimer <= 0) {
           
           // Check Polymerase Phase Shift (passive shift bypass chance)
           const shiftLvl = state.mutationLevels?.polymerase_shift || 0;
@@ -841,7 +967,8 @@ export default function GameCanvas({
             });
           }
         }
-      });
+      }
+    });
 
       state.obstacles = state.obstacles.filter(o => o.x > -60 && o.active);
 
@@ -858,6 +985,143 @@ export default function GameCanvas({
     const draw = (ctx: CanvasRenderingContext2D, width: number, height: number, speed: number) => {
       const state = stateRef.current;
       ctx.clearRect(0, 0, width, height);
+
+      // Dynamic linear gradient matching current cellular zone
+      const getZoneCanvasGradient = (z: GameZone) => {
+        const grad = ctx.createLinearGradient(0, 0, 0, height);
+        if (z === 'Cytoplasm') {
+          grad.addColorStop(0, '#090d1a');
+          grad.addColorStop(0.5, '#0a0d26');
+          grad.addColorStop(1, '#051124');
+        } else if (z === 'Transcription') {
+          grad.addColorStop(0, '#041021');
+          grad.addColorStop(0.5, '#041921');
+          grad.addColorStop(1, '#020d1c');
+        } else if (z === 'Nucleus') {
+          grad.addColorStop(0, '#0a0d26');
+          grad.addColorStop(0.5, '#190a2c');
+          grad.addColorStop(1, '#110424');
+        } else if (z === 'Ribosome') {
+          grad.addColorStop(0, '#110424');
+          grad.addColorStop(0.5, '#2c0429');
+          grad.addColorStop(1, '#2c0214');
+        } else if (z === 'Mitochondria') {
+          grad.addColorStop(0, '#2c0214');
+          grad.addColorStop(0.5, '#330308');
+          grad.addColorStop(1, '#2c0d02');
+        } else {
+          grad.addColorStop(0, '#090d1a');
+          grad.addColorStop(1, '#051124');
+        }
+        return grad;
+      };
+
+      ctx.fillStyle = getZoneCanvasGradient(state.currentZone);
+      ctx.fillRect(0, 0, width, height);
+
+      // Render Parallax Intracellular background organelles deep in the cytosol
+      if (state.backgroundOrganelles) {
+        state.backgroundOrganelles.forEach(org => {
+          ctx.save();
+          if (org.type === 'vesicle') {
+            ctx.globalAlpha = 0.09;
+            ctx.beginPath();
+            ctx.arc(org.x, org.y, org.size * 0.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#06b6d4';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          } else if (org.type === 'lysosome') {
+            ctx.globalAlpha = 0.08;
+            ctx.beginPath();
+            ctx.arc(org.x, org.y, org.size * 0.6, 0, Math.PI * 2);
+            ctx.fillStyle = '#10b981';
+            ctx.fill();
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Inner particles inside lysosome
+            ctx.fillStyle = '#ffffff';
+            for (let j = 0; j < 3; j++) {
+              const dotX = org.x + Math.sin(org.angle + j) * (org.size * 0.2);
+              const dotY = org.y + Math.cos(org.angle + j) * (org.size * 0.2);
+              ctx.beginPath();
+              ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (org.type === 'mitochondria') {
+            ctx.globalAlpha = 0.12;
+            ctx.translate(org.x, org.y);
+            ctx.rotate(org.angle * 0.2);
+            
+            const rx = org.size * 0.9;
+            const ry = org.size * 0.55;
+            
+            // Outer membrane
+            ctx.beginPath();
+            ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+            ctx.strokeStyle = '#f87171';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            
+            // Inner cristae
+            ctx.beginPath();
+            ctx.moveTo(-rx * 0.8, 0);
+            for (let px = -rx * 0.7; px <= rx * 0.7; px += rx * 0.2) {
+              ctx.lineTo(px, ry * 0.5 * Math.sin(px * 0.4 + org.angle));
+              ctx.lineTo(px + rx * 0.1, -ry * 0.5 * Math.sin(px * 0.4 + org.angle));
+            }
+            ctx.lineTo(rx * 0.8, 0);
+            ctx.strokeStyle = '#fca5a5';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          } else if (org.type === 'ribosome_cluster') {
+            ctx.globalAlpha = 0.1;
+            // mRNA strand
+            ctx.beginPath();
+            ctx.moveTo(org.x - org.size * 0.5, org.y);
+            ctx.bezierCurveTo(
+              org.x - org.size * 0.2, org.y - 10 + Math.sin(org.angle) * 8, 
+              org.x + org.size * 0.2, org.y + 10 - Math.sin(org.angle) * 8, 
+              org.x + org.size * 0.5, org.y
+            );
+            ctx.strokeStyle = '#ec4899';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            // Ribosome subunits
+            ctx.fillStyle = '#ec4899';
+            for (let j = 0; j < 5; j++) {
+              const fraction = j / 4;
+              const bx = org.x - org.size * 0.5 + org.size * fraction;
+              const by = org.y + Math.sin(fraction * Math.PI + org.angle) * 5;
+              ctx.beginPath();
+              ctx.arc(bx, by, 3.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (org.type === 'er_strand') {
+            ctx.globalAlpha = 0.08;
+            const erYOffset = Math.sin(org.angle) * 8;
+            for (let offset = -6; offset <= 6; offset += 6) {
+              ctx.beginPath();
+              ctx.moveTo(org.x - org.size, org.y + offset + erYOffset);
+              ctx.bezierCurveTo(
+                org.x - org.size * 0.5, org.y + offset - 15 + erYOffset,
+                org.x + org.size * 0.5, org.y + offset + 15 + erYOffset,
+                org.x + org.size, org.y + offset + erYOffset
+              );
+              ctx.strokeStyle = '#a855f7';
+              ctx.lineWidth = 2.5;
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        });
+      }
 
       // A. Drawing background genomic double-helix scrolling tracks
       ctx.strokeStyle = 'rgba(99, 102, 241, 0.08)'; // faint indigo
@@ -1254,8 +1518,97 @@ export default function GameCanvas({
         ctx.restore();
       });
 
+      // E1. Draw Super-Speed ATP Power-Ups
+      if (state.superSpeedPowerUps) {
+        state.superSpeedPowerUps.forEach(ss => {
+          ctx.save();
+          ctx.shadowBlur = 18;
+          ctx.shadowColor = '#fbbf24'; // golden energy glow
+
+          // Move to center of capsule and rotate
+          ctx.translate(ss.x, ss.y);
+          ctx.rotate(ss.angle);
+
+          // Draw golden capsule pill
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 14, 8, 0, 0, Math.PI * 2);
+          ctx.fillStyle = '#fbbf24';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw shiny energy reflection highlight inside
+          ctx.beginPath();
+          ctx.ellipse(-4, -2, 4, 2, 0, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          ctx.fill();
+
+          // Draw dynamic ATP label
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'black 8px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('ATP', 0, 0.5);
+
+          ctx.restore();
+        });
+      }
+
       // E2. Draw Particles
       state.particles.forEach(p => p.draw(ctx));
+
+      // Draw Player Trail (longer fading stream of cellular essence)
+      if (state.playerTrail && state.playerTrail.length > 0) {
+        state.playerTrail.forEach((pt, idx) => {
+          const ratio = idx / state.playerTrail.length;
+          const alpha = ratio * 0.45;
+          const radius = pt.r * (0.3 + 0.7 * ratio);
+
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.shadowBlur = state.superSpeedTimer > 0 ? 20 : 10;
+          const glowColor = state.superSpeedTimer > 0 ? '#fbbf24' : '#4f46e5';
+          ctx.shadowColor = glowColor;
+
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+          
+          // Gradient fill for each trail bubble
+          const trailGrad = ctx.createRadialGradient(pt.x, pt.y, radius * 0.1, pt.x, pt.y, radius);
+          if (state.superSpeedTimer > 0) {
+            trailGrad.addColorStop(0, '#fef08a'); // gold-200
+            trailGrad.addColorStop(0.5, '#fbbf24'); // gold-400
+            trailGrad.addColorStop(1, '#d97706'); // amber-600
+          } else {
+            trailGrad.addColorStop(0, '#e0e7ff'); // indigo-100
+            trailGrad.addColorStop(0.5, '#6366f1'); // indigo-500
+            trailGrad.addColorStop(1, '#312e81'); // indigo-950
+          }
+          
+          ctx.fillStyle = trailGrad;
+          ctx.fill();
+          
+          ctx.strokeStyle = state.superSpeedTimer > 0 ? 'rgba(251, 191, 36, 0.6)' : 'rgba(99, 102, 241, 0.4)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Add a tiny nucleotide base letter floating in some trail elements for genomic flavor!
+          if (idx % 8 === 0 && ratio > 0.3) {
+            const letters = ['A', 'T', 'C', 'G'];
+            const letter = letters[Math.floor((pt.x + pt.y) / 50) % 4];
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = state.superSpeedTimer > 0 ? '#ffffff' : '#a5b4fc';
+            ctx.font = 'bold 9px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(letter, pt.x, pt.y);
+          }
+
+          ctx.restore();
+        });
+      }
 
       // F. Draw Player Avatar (The Muton Organism)
       const playerX = 100;
@@ -1527,6 +1880,17 @@ export default function GameCanvas({
           <div className="absolute bottom-4 left-4 bg-slate-900/90 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs text-slate-300 shadow-md">
             <span className="w-2 h-2 rounded-full bg-slate-400 animate-ping"></span>
             <span>Epigenetically Silenced by Methyl Tag: Magnet & Thrusters limited!</span>
+          </div>
+        )}
+
+        {/* ATP Super-Speed Boost active notification badge */}
+        {stateRef.current.superSpeedTimer > 0 && (
+          <div className="absolute bottom-4 right-4 bg-amber-950/95 border border-amber-500/40 px-3.5 py-2 rounded-xl flex items-center gap-2.5 text-xs text-amber-200 shadow-xl shadow-amber-500/15 animate-pulse z-10">
+            <Zap className="w-4 h-4 text-amber-400 animate-bounce" />
+            <div>
+              <span className="font-extrabold block text-amber-300">ATP HYPER-CHARGE ACTIVE!</span>
+              <span className="text-[10px] text-amber-400/80">Smashed through obstacles at 2.8x speed! ({Math.round(stateRef.current.superSpeedTimer / 60 * 10) / 10}s)</span>
+            </div>
           </div>
         )}
 
