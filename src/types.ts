@@ -113,36 +113,36 @@ export const GAME_ZONES: GameZoneConfig[] = [
   {
     name: 'Cytoplasm',
     bgGradient: 'from-slate-900 via-indigo-950 to-blue-950',
-    obstacleTypes: ['HISTONE', 'STOP_CODON'],
-    description: 'The fluid-filled arena of the cell. Watch out for histone packaging proteins and termination signals!',
+    obstacleTypes: ['HISTONE', 'STOP_CODON', 'FREE_RADICAL'],
+    description: 'The fluid-filled arena of the cell. Watch out for histone packaging proteins, termination signals, and erratic free radicals!',
     requiredDistance: 1000
   },
   {
     name: 'Transcription',
     bgGradient: 'from-blue-950 via-cyan-950 to-slate-950',
-    obstacleTypes: ['RNA_POLYMERASE', 'SPLICING_SPLICEOSOME', 'STOP_CODON'],
-    description: 'The gene-copying facility. Watch out for rapid-firing RNA Polymerases transcribing sequences and spliceosome clamps slicing introns!',
+    obstacleTypes: ['RNA_POLYMERASE', 'SPLICING_SPLICEOSOME', 'STOP_CODON', 'FREE_RADICAL'],
+    description: 'The gene-copying facility. Watch out for rapid-firing RNA Polymerases transcribing sequences, spliceosome clamps, and free radicals!',
     requiredDistance: 2500
   },
   {
     name: 'Nucleus',
     bgGradient: 'from-indigo-950 via-purple-950 to-violet-950',
-    obstacleTypes: ['HISTONE', 'RESTRICTION_ENZYME', 'REPLICATION_FORK'],
-    description: 'The secure storage of the cell. Restriction enzymes patrol here and replication forks form split blocks requiring micro-precision flight!',
+    obstacleTypes: ['HISTONE', 'RESTRICTION_ENZYME', 'RESTRICTION_ENDONUCLEASE', 'REPLICATION_FORK', 'DNA_METHYLASE'],
+    description: 'The secure storage of the cell. Heavy patrol of restriction endonucleases, active DNA methylases, and splitting replication forks!',
     requiredDistance: 4500
   },
   {
     name: 'Ribosome',
     bgGradient: 'from-violet-950 via-fuchsia-950 to-pink-950',
-    obstacleTypes: ['TRNA_CODON_BLOCK', 'METHYL_GROUP', 'STOP_CODON'],
-    description: 'The protein synthesis factory. High density of tRNA amino-acid blocks and methyl tags that silence genetic thrusters!',
+    obstacleTypes: ['TRNA_CODON_BLOCK', 'METHYL_GROUP', 'DNA_METHYLASE', 'STOP_CODON'],
+    description: 'The protein synthesis factory. High density of tRNA amino-acid blocks, static methyl tags, and DNA methylase enzymes!',
     requiredDistance: 6000
   },
   {
     name: 'Mitochondria',
     bgGradient: 'from-pink-950 via-red-950 to-orange-950',
-    obstacleTypes: ['RESTRICTION_ENZYME', 'METHYL_GROUP', 'FREE_RADICAL'],
-    description: 'The energy powerhouse. Filled with reactive oxygen species (free radicals) causing hyper-mutation rates!',
+    obstacleTypes: ['RESTRICTION_ENDONUCLEASE', 'DNA_METHYLASE', 'FREE_RADICAL', 'METHYL_GROUP'],
+    description: 'The energy powerhouse. Filled with highly dangerous restriction endonucleases, methylating enzymes, and erratic free radicals!',
     requiredDistance: 8000
   }
 ];

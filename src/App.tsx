@@ -326,7 +326,7 @@ export default function App() {
                       <tr key={run.id} className="border-b border-cyan-500/5 hover:bg-cyan-500/5 transition-colors">
                         <td className="py-3 px-4 font-mono text-slate-500">{run.timestamp}</td>
                         <td className="py-3 px-4 font-bold text-cyan-200 font-mono">{run.score} pts</td>
-                        <td className="py-3 px-4 font-mono text-slate-300">{run.distance}m</td>
+                        <td className="py-3 px-4 font-mono text-slate-300">{run.distance} µm</td>
                         <td className="py-3 px-4 text-purple-400 font-mono font-medium">{run.mutationsCount} mutations</td>
                         <td className="py-3 px-4">
                           <div className="flex flex-wrap gap-1.5">

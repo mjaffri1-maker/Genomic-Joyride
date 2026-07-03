@@ -781,14 +781,22 @@ export default function GameCanvas({
             obs.width = 35;
             obs.height = 35;
             obs.radius = 20;
+          } else if (chosenObstacleType === 'RESTRICTION_ENDONUCLEASE') {
+            obs.width = 42;
+            obs.height = 42;
+            obs.radius = 22;
+          } else if (chosenObstacleType === 'DNA_METHYLASE') {
+            obs.width = 46;
+            obs.height = 46;
+            obs.radius = 24;
           } else if (chosenObstacleType === 'METHYL_GROUP') {
             obs.width = 25;
             obs.height = 25;
             obs.radius = 14;
           } else if (chosenObstacleType === 'FREE_RADICAL') {
-            obs.width = 20;
-            obs.height = 20;
-            obs.radius = 12;
+            obs.width = 22;
+            obs.height = 22;
+            obs.radius = 13;
           } else if (chosenObstacleType === 'RNA_POLYMERASE') {
             obs.width = 45;
             obs.height = 45;
@@ -816,9 +824,32 @@ export default function GameCanvas({
         if (o.type === 'RESTRICTION_ENZYME') {
           o.y += Math.sin(state.frame * 0.05 + o.phase) * 3;
         }
-        // Free radicals bounce wildly
+        // Restriction endonucleases track player vertically
+        else if (o.type === 'RESTRICTION_ENDONUCLEASE') {
+          const dy = state.playerY - o.y;
+          o.y += Math.sign(dy) * 1.4 + Math.sin(state.frame * 0.1 + o.phase) * 1.2;
+        }
+        // DNA methylases move in a wave and spawn trailing methyl tags
+        else if (o.type === 'DNA_METHYLASE') {
+          o.y += Math.sin(state.frame * 0.04 + o.phase) * 4.5;
+          // Spawn a trail of methyl tags
+          if (state.frame % 160 === 0 && o.x > 150 && o.x < (canvas?.width || 800) - 100) {
+            state.obstacles.push({
+              x: o.x - 25,
+              y: o.y,
+              type: 'METHYL_GROUP',
+              width: 25,
+              height: 25,
+              radius: 14,
+              active: true,
+              phase: Math.random() * Math.PI * 2
+            });
+          }
+        }
+        // Free radicals bounce wildly and drift horizontally (erratic Brownian motion)
         else if (o.type === 'FREE_RADICAL') {
-          o.y += Math.cos(state.frame * 0.1 + o.phase) * 4;
+          o.y += Math.cos(state.frame * 0.14 + o.phase) * 5.5;
+          o.x += (Math.random() - 0.5) * 4; // horizontal micro-jolt
         }
         // RNA Polymerase slides forward quickly
         else if (o.type === 'RNA_POLYMERASE') {
@@ -863,7 +894,7 @@ export default function GameCanvas({
           
           // Check Polymerase Phase Shift (passive shift bypass chance)
           const shiftLvl = state.mutationLevels?.polymerase_shift || 0;
-          const isShiftable = o.type === 'RNA_POLYMERASE' || o.type === 'RESTRICTION_ENZYME' || o.type === 'REPLICATION_FORK';
+          const isShiftable = o.type === 'RNA_POLYMERASE' || o.type === 'RESTRICTION_ENZYME' || o.type === 'RESTRICTION_ENDONUCLEASE' || o.type === 'REPLICATION_FORK';
           if (isShiftable && shiftLvl > 0) {
             const chance = shiftLvl === 1 ? 0.25 : 0.50;
             if (Math.random() < chance) {
@@ -905,6 +936,24 @@ export default function GameCanvas({
           if (o.type === 'STOP_CODON') {
             damage = 35;
             particlesColor = '#f43f5e';
+          } else if (o.type === 'RESTRICTION_ENDONUCLEASE') {
+            damage = 30;
+            particlesColor = '#f97316'; // orange-red splice sparks
+          } else if (o.type === 'DNA_METHYLASE') {
+            const bypassLvl = state.mutationLevels?.epigenetic_bypass || 0;
+            if (bypassLvl === 2) {
+              damage = 0;
+              particlesColor = '#a855f7';
+            } else {
+              damage = 20;
+              particlesColor = '#c084fc'; // purple epigenetic lockout
+              
+              // More severe silencing from methylase enzyme
+              const duration = bypassLvl === 1 ? 3000 : 8000;
+              state.methylSilencedTimer = duration;
+              state.magnetRange = 0;
+              state.thrusterPower = Math.min(state.thrusterPower, 0.55); // high thruster penalty
+            }
           } else if (o.type === 'METHYL_GROUP') {
             // Check Epigenetic Bypass levels
             const bypassLvl = state.mutationLevels?.epigenetic_bypass || 0;
@@ -1251,6 +1300,97 @@ export default function GameCanvas({
           ctx.beginPath();
           ctx.arc(o.x + 8, o.y + 8, 5, 0, Math.PI * 2);
           ctx.stroke();
+
+        } else if (o.type === 'RESTRICTION_ENDONUCLEASE') {
+          // Large dual-lobed DNA-binding endonuclease clamp patrol
+          ctx.shadowBlur = 18;
+          ctx.shadowColor = '#f97316';
+          ctx.strokeStyle = '#fdba74';
+          ctx.lineWidth = 3;
+
+          // Draw dual lobes of the enzyme clamp
+          ctx.beginPath();
+          ctx.arc(o.x - 12, o.y, o.radius * 0.75, 0, Math.PI * 2);
+          ctx.arc(o.x + 12, o.y, o.radius * 0.75, 0, Math.PI * 2);
+          ctx.fillStyle = '#7c2d12ee'; // translucent deep burnt orange
+          ctx.fill();
+          ctx.stroke();
+
+          // Cleaving site center core
+          ctx.beginPath();
+          ctx.arc(o.x, o.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+
+          // Laser/cutting field line in-between
+          ctx.beginPath();
+          ctx.moveTo(o.x, o.y - o.radius);
+          ctx.lineTo(o.x, o.y + o.radius);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#ffedd5';
+          ctx.font = 'bold 8px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('ENDO-R', o.x, o.y);
+
+        } else if (o.type === 'DNA_METHYLASE') {
+          // Large methyltransferase complex with orbiting methyl tag groups
+          ctx.shadowBlur = 20;
+          ctx.shadowColor = '#d8b4fe';
+          ctx.strokeStyle = '#c084fc';
+          ctx.lineWidth = 3.5;
+
+          // Central enzyme globule
+          ctx.beginPath();
+          ctx.arc(o.x, o.y, o.radius * 0.9, 0, Math.PI * 2);
+          ctx.fillStyle = '#4a044e'; // deep violet/magenta
+          ctx.fill();
+          ctx.stroke();
+
+          // Orbiting -CH3 methyl markers
+          const numOrbits = 3;
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(192, 132, 252, 0.4)';
+          for (let i = 0; i < numOrbits; i++) {
+            const angle = (state.frame * 0.04) + (i * Math.PI * 2 / numOrbits) + o.phase;
+            const ox = o.x + Math.cos(angle) * (o.radius * 1.5);
+            const oy = o.y + Math.sin(angle) * (o.radius * 1.5);
+
+            // Orbit path line
+            ctx.beginPath();
+            ctx.arc(o.x, o.y, o.radius * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Methyl node
+            ctx.save();
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(ox, oy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#334155';
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 7px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Me', ox, oy);
+            ctx.restore();
+          }
+
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#fdf4ff';
+          ctx.font = 'bold 9px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('METHYL', o.x, o.y);
 
         } else if (o.type === 'STOP_CODON') {
           // Drawn as robust octagonal glowing stop chemical barriers with actual letters (TAA/TAG/TGA)
@@ -1753,7 +1893,7 @@ export default function GameCanvas({
           <Award className="w-5 h-5 text-amber-400" />
           <div>
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Completed Distance</span>
-            <span className="text-xl font-extrabold text-white font-mono">{distance}m</span>
+            <span className="text-xl font-extrabold text-white font-mono">{distance} µm</span>
             <span className="text-xs text-indigo-400 font-bold ml-2">Zone: {currentZone}</span>
           </div>
         </div>
@@ -1843,7 +1983,7 @@ export default function GameCanvas({
             </p>
             <div className="mt-6 p-4 bg-slate-900 border border-slate-800 rounded-xl font-mono text-sm inline-block">
               <span className="text-slate-400 block">Final Score: <strong className="text-white">{score}</strong></span>
-              <span className="text-slate-400 block mt-1">Distance Reached: <strong className="text-white">{distance}m</strong></span>
+              <span className="text-slate-400 block mt-1">Distance Reached: <strong className="text-white">{distance} µm</strong></span>
             </div>
             <button
               onClick={handleStartGame}
@@ -1863,7 +2003,7 @@ export default function GameCanvas({
               Phenotype successfully navigated cytoplasm, nucleus, ribosomes, and mitochondria, establishing maximum genomic fitness!
             </p>
             <div className="mt-6 p-4 bg-slate-900 border border-emerald-500/30 rounded-xl font-mono text-sm inline-block text-emerald-100">
-              <span className="text-emerald-400 block">Maximum Distance: <strong className="text-white">7000m (Success!)</strong></span>
+              <span className="text-emerald-400 block">Maximum Distance: <strong className="text-white">7000 µm (Success!)</strong></span>
               <span className="text-emerald-400 block mt-1">Grand Score: <strong className="text-white">{score} pts</strong></span>
             </div>
             <button
@@ -1942,6 +2082,135 @@ export default function GameCanvas({
           <Zap className="w-4 h-4 text-amber-400" />
           Magnet active if Ligand gene has polar Glutamine/Asparagine.
         </span>
+      </div>
+
+      {/* Molecular Element Legend */}
+      <div className="bg-slate-950/45 p-6 border-t border-slate-800/80">
+        <h4 className="text-xs font-bold text-indigo-300 uppercase tracking-widest mb-4 flex items-center gap-2">
+          <Dna className="w-4.5 h-4.5 text-indigo-400" />
+          Intracellular Molecular Legend
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+          
+          {/* Column 1: Core Organism & Collectibles */}
+          <div className="space-y-4">
+            <h5 className="font-bold text-slate-300 border-b border-slate-800/60 pb-1.5 uppercase text-[10px] tracking-wider">
+              Explorer & Resources
+            </h5>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-950 border border-indigo-500/50 flex items-center justify-center relative">
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 border border-white/40 shadow" />
+                  <div className="absolute top-1 right-1.5 w-1 h-1 rounded-full bg-white" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-white block">Muton Organism (You)</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">The engineered player cell. Thrust upward using <kbd className="px-1 py-0.5 bg-slate-800 border border-slate-700 rounded text-[9px] font-mono text-slate-200">Spacebar</kbd> or clicking.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center gap-0.5">
+                  <span className="text-[10px] font-extrabold text-cyan-400 font-mono">A</span>
+                  <span className="text-[10px] font-extrabold text-yellow-400 font-mono">T</span>
+                  <span className="text-[10px] font-extrabold text-pink-400 font-mono">C</span>
+                  <span className="text-[10px] font-extrabold text-emerald-400 font-mono">G</span>
+                </div>
+                <div>
+                  <span className="font-extrabold text-slate-200 block">Nucleotide Bases</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Floating DNA building blocks. Collect bases to score points and trigger spontaneous CRISPR mutations.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-amber-950 border border-amber-500/40 flex items-center justify-center shadow-lg shadow-amber-500/10">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-amber-300 block">ATP Hyper-Charge</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Energy pill granting 2.8x speed boost, invincibility, and power to smash through obstacles.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: New Active Genomic Threats */}
+          <div className="space-y-4">
+            <h5 className="font-bold text-slate-300 border-b border-slate-800/60 pb-1.5 uppercase text-[10px] tracking-wider">
+              Active Genomic Threats
+            </h5>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-orange-950 border border-orange-500/40 flex items-center justify-center relative">
+                  <div className="w-5 h-2 rounded-full bg-orange-700 absolute rotate-12" />
+                  <div className="w-5 h-2 rounded-full bg-orange-700 absolute -rotate-12" />
+                  <div className="w-2 h-2 rounded-full bg-white z-10" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-orange-300 block">Restriction Endonuclease</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Dual-lobed DNA shears patrolling secure areas. They actively home in on your altitude to slice your strands.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-purple-950 border border-purple-500/40 flex items-center justify-center relative">
+                  <div className="w-4 h-4 rounded-full bg-purple-900 border border-purple-400" />
+                  <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-slate-500" />
+                  <div className="absolute bottom-1 left-1 w-1.5 h-1.5 rounded-full bg-slate-500" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-purple-300 block">DNA Methylase</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Sweeping complexes that rise and fall in waves, dropping methyl silencing groups directly in your path.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center relative">
+                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-300 animate-pulse" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-cyan-300 block">Free Radicals</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Highly reactive oxygen species (ROS) moving erratically with horizontal micro-jolts, breaking gene stability.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 3: Secondary Intracellular Elements */}
+          <div className="space-y-4">
+            <h5 className="font-bold text-slate-300 border-b border-slate-800/60 pb-1.5 uppercase text-[10px] tracking-wider">
+              Secondary Barriers
+            </h5>
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  <span className="text-[8px] font-extrabold text-slate-400 font-sans">Me</span>
+                </div>
+                <div>
+                  <span className="font-extrabold text-slate-300 block">Methyl Groups (-CH3)</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Epigenetic tags that block expression. Disables attraction magnet and thwarts thruster speeds.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-rose-950 border border-rose-500/40 flex items-center justify-center">
+                  <div className="text-[8px] font-extrabold text-rose-300 font-mono tracking-tighter">STOP</div>
+                </div>
+                <div>
+                  <span className="font-extrabold text-rose-300 block">Stop Codons</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Red octagonal blocks. Termination signals (TAA/TAG/TGA) that heavily fracture sequence on collision.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 border border-slate-800/80 flex items-center justify-center relative overflow-hidden">
+                  <div className="w-1.5 h-8 bg-pink-500/30 absolute left-1" />
+                  <div className="w-1.5 h-8 bg-pink-500/30 absolute right-1" />
+                  <div className="w-3 h-3 rounded-full bg-pink-500/80" />
+                </div>
+                <div>
+                  <span className="font-extrabold text-slate-300 block">Spliceosomes & Histones</span>
+                  <p className="text-slate-400 text-[11px] leading-snug">Spliceosome clamps slice introns vertically, while circular Histone packaging blocks obstruct DNA strand passage.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );
